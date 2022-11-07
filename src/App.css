@@ -1,4 +1,5 @@
 .App {
+  height: 100%;
   text-align: center;
 }
 
@@ -26,6 +27,12 @@
 
 .App-link {
   color: #61dafb;
+}
+
+.map-input-block {
+  display: inline-block;
+  text-align: left;
+  margin-left: 50px;
 }
 
 @keyframes App-logo-spin {

@@ -1,0 +1,56 @@
+{
+    "geojsonObject": {
+        "type": "FeatureCollection",
+        "description": "Квадрат",
+        "features": [
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "MultiPolygon",
+              "coordinates": [
+                [
+                  [
+                    [50.11694530224387, 53.19765602242835],
+                    [50.12027789802697, 53.19921639621422],
+                    [50.121527807416115, 53.19822984905683],
+                    [50.118154208930584, 53.196762518768914]
+                  ]
+                ]
+              ]
+            }
+          }
+        ]
+    },
+    "geojsonObject2": {
+        "type": "FeatureCollection",
+        "description": "Треуголка",
+        "features": [
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "MultiPolygon",
+              "coordinates": [
+                [
+                  [
+                    [50.11398632353263, 53.19774799404719],
+                    [50.1158531409894, 53.19855138195859],
+                    [50.11822421373621, 53.19670035359171]
+                  ]
+                ]
+              ]
+            }
+          }
+        ]
+    },
+    "center": [50.117237183222585, 53.19711163496421],
+    "cit-c-point1": {"geometry": [50.10955041645299, 53.19887828294811], "description": "123"},
+    "cit-c-point2": {"geometry": [50.11090508313733, 53.19567678795879], "description": "321"},
+    "cit-c-point3": {"geometry": [50.114628572603095, 53.199574855793344], "description": "213"},
+    "cit-c-point4": {"geometry": [50.116085167673894, 53.19619361650631], "description": "432"},
+    "cit-c-point5": {"geometry": [50.117177613977, 53.196266334135885], "description": "543"},
+    "cit-c-point6": {"geometry": [50.11743555268745, 53.195739128526895], "description": "315"},
+    "markerImage24" : "https://cdn2.iconfinder.com/data/icons/social-media-and-payment/64/-47-24.png",
+    "markerImage32" : "https://cdn2.iconfinder.com/data/icons/social-media-and-payment/64/-47-32.png",
+    "markerImage64" : "https://cdn2.iconfinder.com/data/icons/social-media-and-payment/64/-47-64.png"
+    
+}
