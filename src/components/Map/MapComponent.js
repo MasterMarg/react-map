@@ -13,7 +13,7 @@ import { Circle, LineString, Polygon } from 'ol/geom';
 import { fromCircle } from 'ol/geom/Polygon';
 import { unByKey } from 'ol/Observable';
 import GeoJSON from 'ol/format/GeoJSON';
-import { get } from 'ol/proj';
+import Feature from 'ol/Feature';
 
 const MapComponent = ({ children, zoom, center }) => {
     const mapRef = React.useRef();
@@ -145,9 +145,9 @@ const MapComponent = ({ children, zoom, center }) => {
 
                 let listener;
                 draw.on('drawstart', (e) => {
+                    sketch = e.feature;
                     /** Для точек это лишняя логика */
                     if (value !== 'Point') {
-                        sketch = e.feature;
                         let geom;
                         let tooltipCoord = e.coordinate;
                         listener = sketch.getGeometry().on('change', (evt) => {
@@ -185,16 +185,37 @@ const MapComponent = ({ children, zoom, center }) => {
 
                 draw.on('drawend', () => {
                     /** Для точек не инициировался tooltip, поэтому и не удаляется */
-                    if (value !== 'Point') {
-                        /** Тестовая строка, перегонял данные отрисованной фичи в
+                    /** Тестовая строка, перегонял данные отрисованной фичи в
                          * GeoJSON, а потом тестировал их отрисовку, по выведенным
                          * данным
+                         */                
+                    if (value === "Circle") {
+                        /** Circle не поддерживается GeoJSON, есть 2 выхода:
+                         * 1. Переделывать геометрию в полигон с большим количеством точек,
+                         * но выглядит это все равно не очень красиво
+                         * 2. Передавать данные как ключ-значение, отдельно собирая передаваемый
+                         * объект, напрямую ставя центр и радиус, а потом программно создавать
+                         * фичу Circle на основе полученных данных
                          */
+                        /** 2 */
+                        let feature = new Feature({
+                            geometry: new Circle([1,1], 1),
+                        });
+                        console.log(sketch.getGeometry().getCenter());
+                        console.log(sketch.getGeometry().getRadius());
+                        /** 1 */
+                        console.log(new GeoJSON().writeGeometry(fromCircle(sketch.getGeometry(), 100), {
+                            dataProjection: "EPSG:4326", 
+                            featureProjection: "EPSG:3857"
+                        }))
+                    } else {
                         console.log(new GeoJSON().writeFeature(sketch, {
                             dataProjection: "EPSG:4326", 
                             featureProjection: "EPSG:3857"
                         }));
-                        /** Конец теста */
+                    }
+                    /** Конец теста */
+                    if (value !== 'Point') {
                         sketch = null;
                         measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
                         measureTooltipElement = null;
