@@ -13,6 +13,7 @@ import VectorLayer from '../components/Layers/VectorLayer';
 import GeoJSON from 'ol/format/GeoJSON';
 import oilIcon from '../resources/Нефть.png';
 import { blue } from '@mui/material/colors';
+import { Circle } from 'ol/geom';
 
 const markersLonLat = [mapConfig["cit-c-point1"], mapConfig["cit-c-point2"], mapConfig["cit-c-point3"],
   mapConfig["cit-c-point4"], mapConfig["cit-c-point5"], mapConfig["cit-c-point6"]];
@@ -68,6 +69,10 @@ function MapContent() {
     })
   }
 
+  function myFeatures() {
+     
+  }
+
   return (
     <div>
       <Toolbar/>
@@ -85,15 +90,9 @@ function MapContent() {
               style = {style}
             />
           )}
-          {data && (
-            <VectorLayer
+          {(<VectorLayer zIndex={2}
               source={new olSource.Vector({
-                features: [new GeoJSON().readFeature(mapConfig.myObject, {
-                  featureProjection: get("EPSG:3857"),
-                }),
-                new GeoJSON().readFeature(mapConfig.myObject2, {
-                  featureProjection: get("EPSG:3857"),
-                })]
+                features: myFeatures(),
               })}
               style = {
                 new Style({

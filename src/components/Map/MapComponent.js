@@ -9,7 +9,7 @@ import VectorLayer from 'ol/layer/Vector';
 import { ScaleLine, MousePosition, defaults as defaultControls } from 'ol/control';
 import { createStringXY } from 'ol/coordinate';
 import { getArea, getLength } from 'ol/sphere';
-import { Circle, LineString, Polygon } from 'ol/geom';
+import { Circle, LineString, Polygon, Point } from 'ol/geom';
 import { fromCircle } from 'ol/geom/Polygon';
 import { unByKey } from 'ol/Observable';
 import GeoJSON from 'ol/format/GeoJSON';
@@ -53,7 +53,11 @@ const MapComponent = ({ children, zoom, center }) => {
                 /** Условие, чтобы всплывающие окна вылезали только если режим рисования выключен */
                 if (drawTypeSelect.value === 'None') {
                 mapObject.forEachFeatureAtPixel(e.pixel, (feature, layer) => {
-                    document.querySelector('.ol-overlaycontainer').innerHTML = feature.get('description');                
+                    if (feature.getGeometry() instanceof Point || feature.getGeometry() instanceof Circle) {
+                        document.querySelector('.ol-overlaycontainer').innerHTML = feature.get('description');   
+                    } else {
+                        document.querySelector('.ol-overlaycontainer').innerHTML = feature.getProperties()[0];
+                    }                 
                     overlay.setPosition(e.coordinate);
                 })
             }
@@ -167,7 +171,7 @@ const MapComponent = ({ children, zoom, center }) => {
                             measureTooltip.setPosition(tooltipCoord);
                         })
 
-                        /** Кнопка Undo */
+                        /** Кнопка Undo */                    
                         document.getElementById('undo').onclick = function () {
                             if (sketch != null) {
                                 draw.removeLastPoint();
@@ -189,7 +193,7 @@ const MapComponent = ({ children, zoom, center }) => {
                          * GeoJSON, а потом тестировал их отрисовку, по выведенным
                          * данным
                          */                
-                    if (value === "Circle") {
+                    if (sketch.getGeometry() instanceof Circle) {
                         /** Circle не поддерживается GeoJSON, есть 2 выхода:
                          * 1. Переделывать геометрию в полигон с большим количеством точек,
                          * но выглядит это все равно не очень красиво
