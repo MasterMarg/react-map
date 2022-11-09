@@ -70,7 +70,7 @@ function MapContent() {
     })
   }
 
-  function getFeatures() {
+  function loadFeatures() {
     let features = new Collection();    
     fetch("http://localhost:8080/polygon/getAll")
       .then(res => res.json())
@@ -196,7 +196,7 @@ function MapContent() {
           <VectorLayer 
             zIndex={2}
             source={new olSource.Vector({
-              features: getFeatures(),
+              features: loadFeatures(),
             })}
             />                   
           {showLayer2 && (
