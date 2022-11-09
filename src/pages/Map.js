@@ -13,7 +13,7 @@ import VectorLayer from '../components/Layers/VectorLayer';
 import GeoJSON from 'ol/format/GeoJSON';
 import oilIcon from '../resources/Нефть.png';
 import gasIcon from '../resources/Газ.png';
-import { blue } from '@mui/material/colors';
+import { blue, red } from '@mui/material/colors';
 import Collection from 'ol/Collection';
 import { Circle } from 'ol/geom';
 
@@ -78,7 +78,7 @@ function MapContent() {
         features.push(new Feature({
           geometry: new GeoJSON().readGeometry(geometry),
           featureProjection: get("EPSG:3857"),
-          description: geometry.description,
+          description: geometry.description,      
         }))
       }))
     fetch("http://localhost:8080/circle/getAll")
@@ -144,7 +144,7 @@ function MapContent() {
             style = {
               new Style({
                 stroke: new Stroke({
-                  color: blue,
+                  color: blue[900],
                   width: 3,
                 }),
                 fill: new Fill({
