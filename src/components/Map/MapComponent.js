@@ -191,11 +191,12 @@ const MapComponent = ({ children, zoom, center }) => {
                     if (sketch.getGeometry() instanceof Circle) {
                         fetch("http://localhost:8080/circle/add", {
                             method: "POST",
-                            headers: {"Content-Type":"application/json"},
+                            headers: {"Content-Type": "application/json"},
                             body: JSON.stringify({
                                 "center": sketch.getGeometry().getCenter(),
                                 "radius": sketch.getGeometry().getRadius(),
-                                "description": "Area: " +  formatArea(fromCircle(sketch.getGeometry())),
+                                "size": formatArea(fromCircle(sketch.getGeometry())),
+                                "name": "Круг, возможно,\nМихаил",
                             })
                         })
                         /** Circle не поддерживается GeoJSON, есть 2 выхода:
@@ -221,32 +222,35 @@ const MapComponent = ({ children, zoom, center }) => {
                     } else if (sketch.getGeometry() instanceof Point) {
                         fetch("http://localhost:8080/point/add", {
                             method: "POST",
-                            headers: {"Content-Type":"application/json"},
+                            headers: {"Content-Type": "application/json"},
                             body: JSON.stringify({
-                                "type":"Point",
+                                "type": "Point",
                                 "coordinates": sketch.getGeometry().getCoordinates(),
-                                "description": "Газовое месторождение",
+                                "description": "Тут лежит газ и отдыхает",
+                                "name": "Месторождение",
                             }),
                         })
 
                     } else if (sketch.getGeometry() instanceof LineString) {
                         fetch("http://localhost:8080/line/add", {
                             method: "POST",
-                            headers: {"Content-Type":"application/json"},
+                            headers: {"Content-Type": "application/json"},
                             body: JSON.stringify({
                                 "type": "LineString",
                                 "coordinates": sketch.getGeometry().getCoordinates(),
-                                "description": "Length: " + formatLength(sketch.getGeometry()),
+                                "size": formatLength(sketch.getGeometry()),
+                                "name": "Линия чего-то там",
                             }),
                         })
                     } else {
                         fetch("http://localhost:8080/polygon/add", {
                             method: "POST",
-                            headers: {"Content-Type":"application/json"},
+                            headers: {"Content-Type": "application/json"},
                             body: JSON.stringify({
                                 "type": "Polygon",
                                 "coordinates": sketch.getGeometry().getCoordinates(),
-                                "description": "Area: " + formatArea(sketch.getGeometry()),
+                                "size": formatArea(sketch.getGeometry()),
+                                "name": "Любая фигура,\nно Малевича",
                             })
                         })
                     }

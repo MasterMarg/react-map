@@ -75,45 +75,102 @@ function MapContent() {
     fetch("http://localhost:8080/polygon/getAll")
       .then(res => res.json())
       .then((result) => result.map(geometry => {
-        features.push(new Feature({
+        let feature = new Feature({
           geometry: new GeoJSON().readGeometry(geometry),
           featureProjection: get("EPSG:3857"),
-          description: geometry.description,      
+          description: "Area: " + geometry.size,      
+        })
+        feature.setStyle(new Style({
+          stroke: new Stroke({
+            color: "rgba(122, 3, 3)",
+            width: 3,
+          }),
+          fill: new Fill({
+            color: "rgba(36, 171, 212, 0.3)",
+          }),        
+          text: new Text({
+            font: "bold italic 15px serif",
+            fill: new Fill({
+              color: "rgba(122, 3, 3)",
+            }),
+            text: geometry.name,
+          })
         }))
+        features.push(feature);
       }))
     fetch("http://localhost:8080/circle/getAll")
       .then(res => res.json())
       .then((result) => result.map(geometry => {
-        features.push(new Feature({
+        let feature = new Feature({
           geometry: new Circle(geometry.center, geometry.radius),
           featureProjection: get("EPSG:3857"),
-          description: geometry.description,
+          description: "Area: " + geometry.size,
+        })
+        feature.setStyle(new Style({
+          stroke: new Stroke({
+            color: "rgba(0, 122, 122)",
+            width: 3,
+          }),
+          fill: new Fill({
+            color: "rgba(228, 28, 128, 0.2)",
+          }),        
+          text: new Text({
+            font: "bold italic 15px serif",
+            fill: new Fill({
+              color: "rgba(0, 122, 122)",
+            }),
+            text: geometry.name,
+          })
         }))
+        features.push(feature);
       }))
     fetch("http://localhost:8080/line/getAll")
       .then(res => res.json())
       .then((result) => result.map(geometry => {
-        features.push(new Feature({
+        let feature = new Feature({
           geometry: new GeoJSON().readGeometry(geometry),
           featureProjection: get("EPSG:3857"),
-          description: geometry.description,
-        }));
+          description: "Length: " + geometry.size,
+        });
+        feature.setStyle(new Style({
+          stroke: new Stroke({
+            color: "rgba(121, 0, 143)",
+            width: 3,
+          }),     
+          text: new Text({
+            font: "bold italic 15px serif",
+            offsetY: -11,
+            placement: "line",
+            fill: new Fill({
+              color: "rgba(121, 0, 143)",
+            }),
+            text: geometry.name,
+          })
+        }))
+        features.push(feature);
       }))
     fetch("http://localhost:8080/point/getAll")
       .then(res => res.json())
       .then((result) => result.map(geometry => {
-        let iconStyle = new Style({
-          image: new Icon({
-            src: gasIcon,
-            scale: 0.07,
-          }),
-        });
         let feature = new Feature({
           geometry: new GeoJSON().readGeometry(geometry),
           featureProjection: get("EPSG:3857"),
           description: geometry.description,
         });
-        feature.setStyle(iconStyle);
+        feature.setStyle(new Style({
+          image: new Icon({
+            src: gasIcon,
+            scale: 0.07,
+          }),
+          text: new Text({
+            font: "bold italic 15px serif",            
+            offsetX: 75,
+            fill: new Fill({
+              color: blue[900],
+            }),
+            text: geometry.name,
+          })
+        }));
         features.push(feature);
       }))
     return features;
@@ -141,21 +198,6 @@ function MapContent() {
             source={new olSource.Vector({
               features: getFeatures(),
             })}
-            style = {
-              new Style({
-                stroke: new Stroke({
-                  color: blue[900],
-                  width: 3,
-                }),
-                fill: new Fill({
-                  color: "rgba(128, 128, 128, 0.5)",
-                }),
-                text: new Text({
-                  font: " bold italic 15px sans-serif",
-                  placement: "line",
-                  offsetY: -11,
-                })
-              })}
             />                   
           {showLayer2 && (
             <VectorLayer
