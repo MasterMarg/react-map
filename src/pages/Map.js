@@ -12,7 +12,9 @@ import * as olSource from 'ol/source';
 import VectorLayer from '../components/Layers/VectorLayer';
 import GeoJSON from 'ol/format/GeoJSON';
 import oilIcon from '../resources/Нефть.png';
+import gasIcon from '../resources/Газ.png';
 import { blue } from '@mui/material/colors';
+import Collection from 'ol/Collection';
 import { Circle } from 'ol/geom';
 
 const markersLonLat = [mapConfig["cit-c-point1"], mapConfig["cit-c-point2"], mapConfig["cit-c-point3"],
@@ -50,7 +52,6 @@ function MapContent() {
   const [showMarker, setShowMarker] = React.useState(true); 
   const [features, setFeatures] = React.useState(addMarkers(markersLonLat));
   const [mapType, setMapType] = React.useState('OSM');
-  const [data, setData] = React.useState(false);
 
   let style = function(feature, resolution) { 
     let font_size = 20 * 2.388657133911758 / resolution;
@@ -69,8 +70,53 @@ function MapContent() {
     })
   }
 
-  function myFeatures() {
-     
+  function getFeatures() {
+    let features = new Collection();    
+    fetch("http://localhost:8080/polygon/getAll")
+      .then(res => res.json())
+      .then((result) => result.map(geometry => {
+        features.push(new Feature({
+          geometry: new GeoJSON().readGeometry(geometry),
+          featureProjection: get("EPSG:3857"),
+          description: geometry.description,
+        }))
+      }))
+    fetch("http://localhost:8080/circle/getAll")
+      .then(res => res.json())
+      .then((result) => result.map(geometry => {
+        features.push(new Feature({
+          geometry: new Circle(geometry.center, geometry.radius),
+          featureProjection: get("EPSG:3857"),
+          description: geometry.description,
+        }))
+      }))
+    fetch("http://localhost:8080/line/getAll")
+      .then(res => res.json())
+      .then((result) => result.map(geometry => {
+        features.push(new Feature({
+          geometry: new GeoJSON().readGeometry(geometry),
+          featureProjection: get("EPSG:3857"),
+          description: geometry.description,
+        }));
+      }))
+    fetch("http://localhost:8080/point/getAll")
+      .then(res => res.json())
+      .then((result) => result.map(geometry => {
+        let iconStyle = new Style({
+          image: new Icon({
+            src: gasIcon,
+            scale: 0.07,
+          }),
+        });
+        let feature = new Feature({
+          geometry: new GeoJSON().readGeometry(geometry),
+          featureProjection: get("EPSG:3857"),
+          description: geometry.description,
+        });
+        feature.setStyle(iconStyle);
+        features.push(feature);
+      }))
+    return features;
   }
 
   return (
@@ -90,29 +136,27 @@ function MapContent() {
               style = {style}
             />
           )}
-          {(<VectorLayer zIndex={2}
-              source={new olSource.Vector({
-                features: myFeatures(),
-              })}
-              style = {
-                new Style({
-                  stroke: new Stroke({
-                    color: blue,
-                    width: 3,
-                  }),
-                  fill: new Fill({
-                    color: "rgba(255, 0, 255, 0.7)",
-                  }),
-                  text: new Text({
-                    font: " bold italic 15px sans-serif",
-                    text: zoom >= 15 ? "Программная линия" : "",
-                    placement: "line",
-                    offsetY: -11,
-                  })
+          <VectorLayer 
+            zIndex={2}
+            source={new olSource.Vector({
+              features: getFeatures(),
+            })}
+            style = {
+              new Style({
+                stroke: new Stroke({
+                  color: blue,
+                  width: 3,
+                }),
+                fill: new Fill({
+                  color: "rgba(128, 128, 128, 0.5)",
+                }),
+                text: new Text({
+                  font: " bold italic 15px sans-serif",
+                  placement: "line",
+                  offsetY: -11,
                 })
-              }
-            />
-          )}          
+              })}
+            />                   
           {showLayer2 && (
             <VectorLayer
               source = {new olSource.Vector({

@@ -53,11 +53,7 @@ const MapComponent = ({ children, zoom, center }) => {
                 /** Условие, чтобы всплывающие окна вылезали только если режим рисования выключен */
                 if (drawTypeSelect.value === 'None') {
                 mapObject.forEachFeatureAtPixel(e.pixel, (feature, layer) => {
-                    if (feature.getGeometry() instanceof Point || feature.getGeometry() instanceof Circle) {
-                        document.querySelector('.ol-overlaycontainer').innerHTML = feature.get('description');   
-                    } else {
-                        document.querySelector('.ol-overlaycontainer').innerHTML = feature.getProperties()[0];
-                    }                 
+                    document.querySelector('.ol-overlaycontainer').innerHTML = feature.get('description');                
                     overlay.setPosition(e.coordinate);
                 })
             }
@@ -187,13 +183,21 @@ const MapComponent = ({ children, zoom, center }) => {
                     };
                 });
 
-                draw.on('drawend', () => {
-                    /** Для точек не инициировался tooltip, поэтому и не удаляется */
+                draw.on('drawend', () => {                   
                     /** Тестовая строка, перегонял данные отрисованной фичи в
                          * GeoJSON, а потом тестировал их отрисовку, по выведенным
                          * данным
                          */                
                     if (sketch.getGeometry() instanceof Circle) {
+                        fetch("http://localhost:8080/circle/add", {
+                            method: "POST",
+                            headers: {"Content-Type":"application/json"},
+                            body: JSON.stringify({
+                                "center": sketch.getGeometry().getCenter(),
+                                "radius": sketch.getGeometry().getRadius(),
+                                "description": "Area: " +  formatArea(fromCircle(sketch.getGeometry())),
+                            })
+                        })
                         /** Circle не поддерживается GeoJSON, есть 2 выхода:
                          * 1. Переделывать геометрию в полигон с большим количеством точек,
                          * но выглядит это все равно не очень красиво
@@ -201,24 +205,53 @@ const MapComponent = ({ children, zoom, center }) => {
                          * объект, напрямую ставя центр и радиус, а потом программно создавать
                          * фичу Circle на основе полученных данных
                          */
-                        /** 2 */
-                        let feature = new Feature({
-                            geometry: new Circle([1,1], 1),
-                        });
-                        console.log(sketch.getGeometry().getCenter());
-                        console.log(sketch.getGeometry().getRadius());
-                        /** 1 */
-                        console.log(new GeoJSON().writeGeometry(fromCircle(sketch.getGeometry(), 100), {
-                            dataProjection: "EPSG:4326", 
-                            featureProjection: "EPSG:3857"
-                        }))
+                        /** 1 
+                         * console.log(new GeoJSON().writeGeometry(fromCircle(sketch.getGeometry(), 100), {
+                         *     dataProjection: "EPSG:4326", 
+                         *     featureProjection: "EPSG:3857"
+                         * }))
+                         */
+                        /** 2 
+                         * let feature = new Feature({
+                         *   geometry: new Circle([1,1], 1),
+                         * });
+                         * console.log(sketch.getGeometry().getCenter());
+                         * console.log(sketch.getGeometry().getRadius());
+                         */                
+                    } else if (sketch.getGeometry() instanceof Point) {
+                        fetch("http://localhost:8080/point/add", {
+                            method: "POST",
+                            headers: {"Content-Type":"application/json"},
+                            body: JSON.stringify({
+                                "type":"Point",
+                                "coordinates": sketch.getGeometry().getCoordinates(),
+                                "description": "Газовое месторождение",
+                            }),
+                        })
+
+                    } else if (sketch.getGeometry() instanceof LineString) {
+                        fetch("http://localhost:8080/line/add", {
+                            method: "POST",
+                            headers: {"Content-Type":"application/json"},
+                            body: JSON.stringify({
+                                "type": "LineString",
+                                "coordinates": sketch.getGeometry().getCoordinates(),
+                                "description": "Length: " + formatLength(sketch.getGeometry()),
+                            }),
+                        })
                     } else {
-                        console.log(new GeoJSON().writeFeature(sketch, {
-                            dataProjection: "EPSG:4326", 
-                            featureProjection: "EPSG:3857"
-                        }));
+                        fetch("http://localhost:8080/polygon/add", {
+                            method: "POST",
+                            headers: {"Content-Type":"application/json"},
+                            body: JSON.stringify({
+                                "type": "Polygon",
+                                "coordinates": sketch.getGeometry().getCoordinates(),
+                                "description": "Area: " + formatArea(sketch.getGeometry()),
+                            })
+                        })
                     }
                     /** Конец теста */
+                    /** Для точек не инициировался tooltip, поэтому и не удаляется */
                     if (value !== 'Point') {
                         sketch = null;
                         measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
