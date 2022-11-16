@@ -360,6 +360,10 @@ const MapComponent = ({ children, zoom, center }) => {
                     mapObject.addInteraction(modify);
 
                     select.on('select', (e) => {
+                        /** todo: нужно сделать перебор фич на этой
+                         * координате, а не просто выбирать первую фичу
+                         * сверху
+                         */
                         feature = e.selected[0];                        
                     })
                     modify.on('modifystart', (e) => {
