@@ -79,6 +79,11 @@ button:not(:disabled).form-control:hover {
     color: whitesmoke;
 }
 
+.form-control:active {
+    background-color: royalblue!important;
+    color: whitesmoke;
+}
+
 .form-control-toggled {
     background-color: blueviolet;
     color: whitesmoke;
@@ -108,6 +113,13 @@ button:not(:disabled).form-control:hover {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
+}
+
+.form-select:hover:not(:disabled) {
+    /** Тест стиля
+    background: linear-gradient(white 0%, whitesmoke 80%, gray 100%);
+    */
+    border-bottom-color: black;
 }
 
 .row {

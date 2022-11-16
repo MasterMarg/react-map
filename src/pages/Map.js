@@ -354,7 +354,7 @@ function MapContent() {
               <option value='LineString'>LineString</option>
               <option value='Polygon'>Polygon</option>
               <option value='Circle'>Circle</option>
-            </select> 
+            </select>
             <button className='form-control' id='modify'><i className='fa fa-edit'/></button>           
             <button className="form-control" id="undo"><i className='fa fa-undo'/></button>           
           </span>

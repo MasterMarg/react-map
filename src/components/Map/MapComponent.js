@@ -457,6 +457,7 @@ const MapComponent = ({ children, zoom, center }) => {
             if (overlayDiv && overlayDiv.parentNode) {
                 overlayDiv.parentNode.removeChild(overlayDiv);
             }
+            modifyButton.disabled = event.target.value !== 'None'
             /** Конец вырезания последнего заготовленного div'а */
             addInteraction();
         }
