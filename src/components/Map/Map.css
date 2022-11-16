@@ -74,7 +74,7 @@
     border: 1px solid #ced4da;
 }
 
-.form-control:hover {
+button:not(:disabled).form-control:hover {
     background-color: dodgerblue;
     color: whitesmoke;
 }
