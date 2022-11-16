@@ -354,14 +354,9 @@ function MapContent() {
               <option value='LineString'>LineString</option>
               <option value='Polygon'>Polygon</option>
               <option value='Circle'>Circle</option>
-            </select>            
+            </select> 
+            <button className='form-control' id='modify'><i className='fa fa-edit'/></button>           
             <button className="form-control" id="undo"><i className='fa fa-undo'/></button>           
-          </span>
-        </div>
-        <div className='col-auto' id='featureControls'>
-          <span className='input-group'>
-            <label className='input-group-text' htmlFor='modify'>Features:</label>
-            <button className='form-control' id='modify'><i className='fa fa-edit'/></button>
           </span>
         </div>
       </div>

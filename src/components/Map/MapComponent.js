@@ -27,7 +27,6 @@ const MapComponent = ({ children, zoom, center }) => {
         const stepsRange = document.getElementById('steps');
         const scaleTextCheckbox = document.getElementById('showScaleText');
         const invertColorsCheckbox = document.getElementById('invertColors');
-        const featureControls = document.getElementById('featureControls');
         const modifyButton = document.getElementById('modify');
         const undoButton = document.getElementById('undo');
 
@@ -457,11 +456,6 @@ const MapComponent = ({ children, zoom, center }) => {
             const overlayDiv = document.querySelector('.ol-overlay-container.ol-selectable:last-child');
             if (overlayDiv && overlayDiv.parentNode) {
                 overlayDiv.parentNode.removeChild(overlayDiv);
-            }
-            if (event.target.value === 'None') {
-                featureControls.style.display = 'block'
-            } else {
-                featureControls.style.display = 'none';
             }
             /** Конец вырезания последнего заготовленного div'а */
             addInteraction();
