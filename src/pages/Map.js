@@ -348,13 +348,15 @@ function MapContent() {
         <div className='col-auto'>
           <span className='input-group'>
             <label className="input-group-text" htmlFor="drawType">Geometry type:</label>
-            <select className='form-select' id='drawType' defaultValue='None'>          
-              <option value='None'>None</option>
-              <option value='Point'>Point</option>
-              <option value='LineString'>LineString</option>
-              <option value='Polygon'>Polygon</option>
-              <option value='Circle'>Circle</option>
-            </select>
+            <div className='form-select-box'>
+              <select className='form-select' id='drawType' defaultValue='None'>          
+                <option value='None'>None</option>
+                <option value='Point'>Point</option>
+                <option value='LineString'>LineString</option>
+                <option value='Polygon'>Polygon</option>
+                <option value='Circle'>Circle</option>
+              </select>
+            </div>
             <button className='form-control' id='modify'><i className='fa fa-edit'/></button>           
             <button className="form-control" id="undo"><i className='fa fa-undo'/></button>           
           </span>
