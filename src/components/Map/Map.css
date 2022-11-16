@@ -62,12 +62,26 @@
 }
 
 .form-control {
+    /* Пример стиля
+    background-color: dodgerblue;
+    color: rgb(247, 247, 247);
+    */
     flex: 1 1 auto;
     width: 1%;
     padding: 0.375rem 0.75rem;
     font-size: 1rem;
     background-color: #fff;
     border: 1px solid #ced4da;
+}
+
+.form-control:hover {
+    background-color: dodgerblue;
+    color: whitesmoke;
+}
+
+.form-control-toggled {
+    background-color: blueviolet;
+    color: whitesmoke;
 }
 
 .input-group-text {

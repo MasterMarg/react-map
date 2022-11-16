@@ -3,17 +3,16 @@ import * as ol from 'ol';
 import MapContext from './MapContext';
 import './Map.css';
 import { Overlay } from 'ol';
-import Draw from 'ol/interaction/Draw';
+import { Draw, Select, Modify } from 'ol/interaction';
 import { Vector as VectorSource } from 'ol/source';
 import VectorLayer from 'ol/layer/Vector';
 import { ScaleLine, MousePosition, defaults as defaultControls } from 'ol/control';
 import { createStringXY } from 'ol/coordinate';
 import { getArea, getLength } from 'ol/sphere';
-import { Circle, LineString, Polygon, Point } from 'ol/geom';
+import { Circle, LineString, Point, Polygon } from 'ol/geom';
 import { fromCircle } from 'ol/geom/Polygon';
 import { unByKey } from 'ol/Observable';
-import GeoJSON from 'ol/format/GeoJSON';
-import Feature from 'ol/Feature';
+import WKT from 'ol/format/WKT';
 
 const MapComponent = ({ children, zoom, center }) => {
     const mapRef = React.useRef();
@@ -28,6 +27,9 @@ const MapComponent = ({ children, zoom, center }) => {
         const stepsRange = document.getElementById('steps');
         const scaleTextCheckbox = document.getElementById('showScaleText');
         const invertColorsCheckbox = document.getElementById('invertColors');
+        const featureControls = document.getElementById('featureControls');
+        const modifyButton = document.getElementById('modify');
+        const undoButton = document.getElementById('undo');
 
         let control;
         
@@ -39,8 +41,9 @@ const MapComponent = ({ children, zoom, center }) => {
         };
 
         let mapObject = new ol.Map(options);
-        mapObject.setTarget(mapRef.current);   
-
+        mapObject.setTarget(mapRef.current);        
+        
+        let isModifyModeOn = false;
         /** Блок оверлея с всплывающей информацией по фичам */
         const overlay = new Overlay({
             element: document.querySelector('.ol-overlaycontainer'),
@@ -51,7 +54,7 @@ const MapComponent = ({ children, zoom, center }) => {
         mapObject.on('click', (e) => {
             overlay.setPosition(undefined);
                 /** Условие, чтобы всплывающие окна вылезали только если режим рисования выключен */
-                if (drawTypeSelect.value === 'None') {
+                if (!isModifyModeOn && drawTypeSelect.value === 'None') {
                 mapObject.forEachFeatureAtPixel(e.pixel, (feature, layer) => {
                     document.querySelector('.ol-overlaycontainer').innerHTML = feature.get('description');                
                     overlay.setPosition(e.coordinate);
@@ -117,6 +120,20 @@ const MapComponent = ({ children, zoom, center }) => {
         stepsRange.addEventListener('input', reconfigureScaleLine);
         scaleTextCheckbox.addEventListener('change', reconfigureScaleLine);
         invertColorsCheckbox.addEventListener('change', onInvertColorsChange);
+        
+        let select;
+        let modify;
+        let value = drawTypeSelect.value
+        modifyButton.onclick = function() {
+            if (value === 'None') {
+                isModifyModeOn = !isModifyModeOn;
+                modifyButton.classList.toggle('form-control-toggled')
+                drawTypeSelect.disabled = isModifyModeOn;
+                undoButton.disabled = isModifyModeOn;
+                overlay.setPosition(undefined);
+                addInteraction();
+            }
+        }
 
         /** Начало блока с рисованием фич */
         const drawSource = new VectorSource({ wrapX: false });
@@ -128,8 +145,14 @@ const MapComponent = ({ children, zoom, center }) => {
 
         let draw;
         let sketch;
+        let listener;
+        let measureTooltip;
+        let measureTooltipElement;
         function addInteraction() {
-            const value = drawTypeSelect.value;
+            value = drawTypeSelect.value;
+            if (value !== 'Point') {
+                createMeasureTooltip();
+            }
             if (value !== 'None') {
                 draw = new Draw({
                     source: drawSource,
@@ -139,11 +162,7 @@ const MapComponent = ({ children, zoom, center }) => {
                 /** Для точек не нужен тултип, у них нет длины или плошади, нет информации, а div будут
                  *  плодиться.
                  */
-                if (value !== 'Point') {
-                    createMeasureTooltip();
-                }
 
-                let listener;
                 draw.on('drawstart', (e) => {
                     sketch = e.feature;
                     /** Для точек это лишняя логика */
@@ -168,7 +187,7 @@ const MapComponent = ({ children, zoom, center }) => {
                         })
 
                         /** Кнопка Undo */                    
-                        document.getElementById('undo').onclick = function () {
+                        undoButton.onclick = function () {
                             if (sketch != null) {
                                 draw.removeLastPoint();
                                 if (geom instanceof Circle 
@@ -183,23 +202,8 @@ const MapComponent = ({ children, zoom, center }) => {
                     };
                 });
 
-                draw.on('drawend', () => {                   
-                    /** Тестовая строка, перегонял данные отрисованной фичи в
-                         * GeoJSON, а потом тестировал их отрисовку, по выведенным
-                         * данным
-                         */                
-                    if (sketch.getGeometry() instanceof Circle) {
-                        fetch("http://localhost:8080/circle/add", {
-                            method: "POST",
-                            headers: {"Content-Type": "application/json"},
-                            body: JSON.stringify({
-                                "center": sketch.getGeometry().getCenter(),
-                                "radius": sketch.getGeometry().getRadius(),
-                                "size": formatArea(fromCircle(sketch.getGeometry())),
-                                "name": "Круг, возможно,\nМихаил",
-                            })
-                        })
-                        /** Circle не поддерживается GeoJSON, есть 2 выхода:
+                draw.on('drawend', () => { 
+                    /** Circle не поддерживается GeoJSON и WKT, есть 2 выхода:
                          * 1. Переделывать геометрию в полигон с большим количеством точек,
                          * но выглядит это все равно не очень красиво
                          * 2. Передавать данные как ключ-значение, отдельно собирая передаваемый
@@ -216,9 +220,54 @@ const MapComponent = ({ children, zoom, center }) => {
                          * let feature = new Feature({
                          *   geometry: new Circle([1,1], 1),
                          * });
-                         * console.log(sketch.getGeometry().getCenter());
-                         * console.log(sketch.getGeometry().getRadius());
-                         */                
+                         * console.log(feature.getGeometry().getCenter());
+                         * console.log(feature.getGeometry().getRadius());
+                         */  
+                  
+                    /** Начало части для PostGIS */
+                    if (sketch.getGeometry() instanceof Circle) {
+                        fetch("http://localhost:8080/circle/add", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                "name": "Круг, возможно,\nМихаил",
+                                "description": "Area: " + formatArea(fromCircle(sketch.getGeometry())),
+                                "center": sketch.getGeometry().getCenter(),
+                                "radius": sketch.getGeometry().getRadius(),
+                            })
+                        })
+                    } else {
+                        fetch("http://localhost:8080/feature/add", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                "name": sketch.getGeometry() instanceof Polygon 
+                                    ? "Любая фигура, но\nМалевича" :
+                                    sketch.getGeometry() instanceof LineString
+                                    ? "Трубопровод с мечтами" : "Месторождение",
+                                "description": sketch.getGeometry() instanceof Polygon 
+                                    ? "Area: " + formatArea(sketch.getGeometry()) :
+                                    sketch.getGeometry() instanceof LineString
+                                    ? "Length: " + formatLength(sketch.getGeometry()) :
+                                    "Здесь лежит газ и отдыхает",
+                                "geometry": new WKT().writeGeometry(sketch.getGeometry()),
+                            })
+                        })  
+                    }
+                    /** Конец части для PostGIS */
+                    /** Начало части без PostGIS */   
+                    /*           
+                    if (sketch.getGeometry() instanceof Circle) {
+                        fetch("http://localhost:8080/circle/add", {
+                            method: "POST",
+                            headers: {"Content-Type": "application/json"},
+                            body: JSON.stringify({
+                                "center": sketch.getGeometry().getCenter(),
+                                "radius": sketch.getGeometry().getRadius(),
+                                "size": formatArea(fromCircle(sketch.getGeometry())),
+                                "name": "Круг, возможно,\nМихаил",
+                            })
+                        })                   
                     } else if (sketch.getGeometry() instanceof Point) {
                         fetch("http://localhost:8080/point/add", {
                             method: "POST",
@@ -230,7 +279,6 @@ const MapComponent = ({ children, zoom, center }) => {
                                 "name": "Месторождение",
                             }),
                         })
-
                     } else if (sketch.getGeometry() instanceof LineString) {
                         fetch("http://localhost:8080/line/add", {
                             method: "POST",
@@ -254,7 +302,9 @@ const MapComponent = ({ children, zoom, center }) => {
                             })
                         })
                     }
-                    /** Конец теста */
+                    */
+                    /** Конец части без PostGIS */
+
                     /** Для точек не инициировался tooltip, поэтому и не удаляется */
                     if (value !== 'Point') {
                         sketch = null;
@@ -269,11 +319,127 @@ const MapComponent = ({ children, zoom, center }) => {
                     draw.abortDrawing();
                     measureTooltip.setPosition(undefined);
                 }
+            } else {
+                /** Начало блока с модифицированием фич */
+                if (isModifyModeOn) {
+                    let feature;
+                    select = new Select({
+                        wrapX: false,
+                        filter: function(featureToSelect, layer) {
+                            if (feature) {
+                                /** Ищем ближайшую точку из геометрии и сравниваем координаты
+                                 * 
+                                 * Также смотрим на поле id, у фич, полученных из БД оно есть
+                                 * (для апдейта геометрии), а у узловых точек других фич - его нет.
+                                 * Так мы оставляем возможность выбирать и модифицировать 
+                                 * фичи, с пересекающимися координатами.
+                                 * 
+                                 * Так же проверяем только точки, поскольку у круга 
+                                 * circle.getGeometry().getCoordinates() возвращает null,
+                                 * геометрия круга определяется иначе (центр + радиус), поэтому
+                                 * если нужно фильтровать круги, то нужно делать отдельную ветку
+                                 * if (featureToSelect.getGeometry() instanceof Circle), но в нашем
+                                 * случае проблема была только с точками, поэтому я исключил из проверки
+                                 * все другие типы геометрий
+                                 */
+                                if (featureToSelect.getGeometry() instanceof Point && !featureToSelect.get("id")) {
+                                    let featureToSelectCoords = featureToSelect.getGeometry().getCoordinates();
+                                    let closestPointCoords = feature.getGeometry().getClosestPoint(featureToSelectCoords);
+                                    if (featureToSelectCoords[0] === closestPointCoords[0] 
+                                            && featureToSelectCoords[1] === closestPointCoords[1]) {
+                                        return false;
+                                    }
+                                }
+                            }
+                            return true;
+                        }
+                    })
+                    mapObject.addInteraction(select);
+                    modify = new Modify({
+                        features: select.getFeatures(),
+                    })                       
+                    mapObject.addInteraction(modify);
+
+                    select.on('select', (e) => {
+                        feature = e.selected[0];                        
+                    })
+                    modify.on('modifystart', (e) => {
+                        /** Для точек это лишняя логика */
+                        if (value !== 'Point') {
+                            let geom;
+                            let tooltipCoord = e.coordinate;
+                            listener = feature.getGeometry().on('change', (evt) => {
+                                geom = evt.target;
+                                let output;
+                                if (geom instanceof Polygon) {
+                                    output = formatArea(geom);
+                                    tooltipCoord = geom.getInteriorPoint().getCoordinates();
+                                } else if (geom instanceof LineString) {
+                                    output = formatLength(geom);
+                                    tooltipCoord = geom.getLastCoordinate();
+                                } else if (geom instanceof Circle) {
+                                    output = formatArea(fromCircle(geom));
+                                    tooltipCoord = geom.getCenter();
+                                }
+                                measureTooltipElement.innerHTML = output;
+                                measureTooltip.setPosition(tooltipCoord);
+                            })
+                        }
+                    })
+                    modify.on('modifyend', () => {                    
+                        if (feature.getGeometry() instanceof Circle) {
+                            feature.set("description", "Area: " 
+                                + formatArea(fromCircle(feature.getGeometry())));
+                            fetch("http://localhost:8080/circle/update", {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    "id": feature.get("id"),
+                                    "name": feature.get("name"),
+                                    "description": feature.get("description"),
+                                    "center": feature.getGeometry().getCenter(),
+                                    "radius": feature.getGeometry().getRadius(),
+                                })
+                            })
+                        } else {
+                            feature.set("description", 
+                                feature.getGeometry() instanceof Polygon
+                                ? "Area: " + formatArea(feature.getGeometry())
+                                : feature.getGeometry() instanceof LineString
+                                ? "Length: " + formatLength(feature.getGeometry())
+                                : "Здесь лежит газ и отдыхает");
+                            fetch("http://localhost:8080/feature/update", {
+                                method: "PUT",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    "id": feature.get("id"),
+                                    "name": feature.get("name"),
+                                    "description": feature.get("description"),
+                                    "geometry": new WKT().writeGeometry(feature.getGeometry()),
+                                })
+                            })
+                        }
+                        mapObject.removeInteraction(modify);
+                        mapObject.removeInteraction(select);
+                        isModifyModeOn = !isModifyModeOn;
+                        modifyButton.classList.toggle('form-control-toggled')
+                        drawTypeSelect.disabled = isModifyModeOn;
+                        undoButton.disabled = isModifyModeOn;
+                        if (value !== 'Point') {
+                            feature = null;
+                            measureTooltip.setPosition(undefined);
+                        }
+                    }) 
+                /** Конец блока с модифицированием фич */
+                } else {
+                    mapObject.removeInteraction(modify);
+                    mapObject.removeInteraction(select);
+                }                        
             }
         }
 
         /** Переключатель типа рисовки */
-        drawTypeSelect.onchange = function() {
+        drawTypeSelect.onchange = (event) => {
             mapObject.removeInteraction(draw);
             /** После отрисовки фичи вызывается метод createMeasureTooltip(), который заготавливает div
              *  под следующую фичу, которую пользователь будет рисовать. Это сделано для того,
@@ -291,6 +457,11 @@ const MapComponent = ({ children, zoom, center }) => {
             const overlayDiv = document.querySelector('.ol-overlay-container.ol-selectable:last-child');
             if (overlayDiv && overlayDiv.parentNode) {
                 overlayDiv.parentNode.removeChild(overlayDiv);
+            }
+            if (event.target.value === 'None') {
+                featureControls.style.display = 'block'
+            } else {
+                featureControls.style.display = 'none';
             }
             /** Конец вырезания последнего заготовленного div'а */
             addInteraction();
@@ -322,8 +493,6 @@ const MapComponent = ({ children, zoom, center }) => {
         }
         /** Конец блока с вычислением значения для линейки на карте */
         /** Начало блока с линейкой на карте */
-        let measureTooltip;
-        let measureTooltipElement;
 
         function createMeasureTooltip() {
             if (measureTooltipElement) {

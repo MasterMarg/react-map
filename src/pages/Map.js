@@ -13,9 +13,11 @@ import VectorLayer from '../components/Layers/VectorLayer';
 import GeoJSON from 'ol/format/GeoJSON';
 import oilIcon from '../resources/Нефть.png';
 import gasIcon from '../resources/Газ.png';
-import { blue, red } from '@mui/material/colors';
+import { blue } from '@mui/material/colors';
 import Collection from 'ol/Collection';
-import { Circle } from 'ol/geom';
+import { Circle, LineString, Polygon } from 'ol/geom';
+import WKT from 'ol/format/WKT';
+import { getContext } from 'ol/webgl';
 
 const markersLonLat = [mapConfig["cit-c-point1"], mapConfig["cit-c-point2"], mapConfig["cit-c-point3"],
   mapConfig["cit-c-point4"], mapConfig["cit-c-point5"], mapConfig["cit-c-point6"]];
@@ -53,6 +55,8 @@ function MapContent() {
   const [features, setFeatures] = React.useState(addMarkers(markersLonLat));
   const [mapType, setMapType] = React.useState('OSM');
 
+  getContext('2d', { willReadFrequently: true });
+
   let style = function(feature, resolution) { 
     let font_size = 20 * 2.388657133911758 / resolution;
     return new Style({
@@ -70,8 +74,111 @@ function MapContent() {
     })
   }
 
+  function getFeatureStyle(feature) {  
+    let geometry = feature.getGeometry();
+    if (geometry instanceof Circle) {
+      return new Style({
+        stroke: new Stroke({
+          color: "rgba(0, 122, 122)",
+          width: 3,
+        }),
+        fill: new Fill({
+          color: "rgba(228, 28, 128, 0.2)",
+        }),        
+        text: new Text({
+          font: "bold italic 15px serif",
+          fill: new Fill({
+            color: "rgba(0, 122, 122)",
+          }),
+          text: feature.get("name"),
+        })
+      })
+    } 
+    if (geometry instanceof Polygon) {
+      return new Style({
+        stroke: new Stroke({
+          color: "rgba(122, 3, 3)",
+          width: 3,
+        }),
+        fill: new Fill({
+          color: "rgba(36, 171, 212, 0.3)",
+        }),        
+        text: new Text({
+          font: "bold italic 15px serif",
+          fill: new Fill({
+            color: "rgba(122, 3, 3)",
+          }),
+          text: feature.get("name"),
+        })
+      })
+    } 
+    if (geometry instanceof LineString) {
+      return new Style({
+        stroke: new Stroke({
+          color: "rgba(121, 0, 143)",
+          width: 3,
+        }),     
+        text: new Text({
+          font: "bold italic 15px serif",
+          offsetY: -11,
+          placement: "line",
+          fill: new Fill({
+            color: "rgba(121, 0, 143)",
+          }),
+          text: feature.get("name"),
+        })
+      })
+    }
+    if (geometry instanceof Point) {
+      return new Style({
+        image: new Icon({
+          src: gasIcon,
+          scale: 0.07,
+        }),
+        text: new Text({
+          font: "bold italic 15px serif",            
+          offsetX: 75,
+          fill: new Fill({
+            color: blue[900],
+          }),
+          text: feature.get("name"),
+        })
+      })
+    }
+  }
+
   function loadFeatures() {
-    let features = new Collection();    
+    let features = new Collection();  
+    /** Начало части с PostGIS */
+    fetch("http://localhost:8080/feature/getAll")
+      .then(res => res.json())
+      .then((result) => result.map(object => {
+        let feature = new Feature({
+          geometry: new WKT().readGeometry(object[3]),
+          featureProjection: get("EPSG:3857"),
+          id: object[0],
+          name: object[1],
+          description: object[2],
+        })
+        feature.setStyle(getFeatureStyle(feature))
+        features.push(feature)
+      })) 
+    fetch("http://localhost:8080/circle/getAll")
+      .then(res => res.json())
+      .then((result) => result.map(circle => {
+        let feature = new Feature({
+          geometry: new Circle(circle.center, circle.radius),
+          featureProjection: get("EPSG:3857"),
+          id: circle.id,
+          name: circle.name,
+          description: circle.description,
+        })
+        feature.setStyle(getFeatureStyle(feature))
+        features.push(feature);
+      }))
+    /** Конец части с PostGIS */
+    /** Начало части без PostGIS */
+    /*
     fetch("http://localhost:8080/polygon/getAll")
       .then(res => res.json())
       .then((result) => result.map(geometry => {
@@ -173,6 +280,8 @@ function MapContent() {
         }));
         features.push(feature);
       }))
+      */
+    /** Конец части без PostGIS */
     return features;
   }
 
@@ -225,6 +334,7 @@ function MapContent() {
           {showMarker && <VectorLayer source={new olSource.Vector({ features })}/>}   
         </Layers>
       </MapComponent>
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"></link>
       <div className='row'>
         <div className='col-auto'>
           <span className='input-group'>
@@ -244,10 +354,16 @@ function MapContent() {
               <option value='LineString'>LineString</option>
               <option value='Polygon'>Polygon</option>
               <option value='Circle'>Circle</option>
-            </select>
-            <input className="form-control" type="button" value="Undo" id="undo"/>
+            </select>            
+            <button className="form-control" id="undo"><i className='fa fa-undo'/></button>           
           </span>
-        </div>        
+        </div>
+        <div className='col-auto' id='featureControls'>
+          <span className='input-group'>
+            <label className='input-group-text' htmlFor='modify'>Features:</label>
+            <button className='form-control' id='modify'><i className='fa fa-edit'/></button>
+          </span>
+        </div>
       </div>
       <div className='row'>
         <div className='col-auto'>
