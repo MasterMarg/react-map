@@ -12,11 +12,6 @@ import * as olSource from 'ol/source';
 import VectorLayer from '../components/Layers/VectorLayer';
 import GeoJSON from 'ol/format/GeoJSON';
 import oilIcon from '../resources/Нефть.png';
-import gasIcon from '../resources/Газ.png';
-import { blue } from '@mui/material/colors';
-import Collection from 'ol/Collection';
-import { Circle, LineString, Polygon } from 'ol/geom';
-import WKT from 'ol/format/WKT';
 import { getContext } from 'ol/webgl';
 
 const markersLonLat = [mapConfig["cit-c-point1"], mapConfig["cit-c-point2"], mapConfig["cit-c-point3"],
@@ -72,218 +67,7 @@ function MapContent() {
         text: resolution <= 4.777314267823516 ? mapConfig.geojsonObject.description : '',
       }),
     })
-  }
-
-  function getFeatureStyle(feature) {  
-    let geometry = feature.getGeometry();
-    if (geometry instanceof Circle) {
-      return new Style({
-        stroke: new Stroke({
-          color: "rgba(0, 122, 122)",
-          width: 3,
-        }),
-        fill: new Fill({
-          color: "rgba(228, 28, 128, 0.2)",
-        }),        
-        text: new Text({
-          font: "bold italic 15px serif",
-          fill: new Fill({
-            color: "rgba(0, 122, 122)",
-          }),
-          text: feature.get("name"),
-        })
-      })
-    } 
-    if (geometry instanceof Polygon) {
-      return new Style({
-        stroke: new Stroke({
-          color: "rgba(122, 3, 3)",
-          width: 3,
-        }),
-        fill: new Fill({
-          color: "rgba(36, 171, 212, 0.3)",
-        }),        
-        text: new Text({
-          font: "bold italic 15px serif",
-          fill: new Fill({
-            color: "rgba(122, 3, 3)",
-          }),
-          text: feature.get("name"),
-        })
-      })
-    } 
-    if (geometry instanceof LineString) {
-      return new Style({
-        stroke: new Stroke({
-          color: "rgba(121, 0, 143)",
-          width: 3,
-        }),     
-        text: new Text({
-          font: "bold italic 15px serif",
-          offsetY: -11,
-          placement: "line",
-          fill: new Fill({
-            color: "rgba(121, 0, 143)",
-          }),
-          text: feature.get("name"),
-        })
-      })
-    }
-    if (geometry instanceof Point) {
-      return new Style({
-        image: new Icon({
-          src: gasIcon,
-          scale: 0.07,
-        }),
-        text: new Text({
-          font: "bold italic 15px serif",            
-          offsetX: 75,
-          fill: new Fill({
-            color: blue[900],
-          }),
-          text: feature.get("name"),
-        })
-      })
-    }
-  }
-
-  function loadFeatures() {
-    let features = new Collection();  
-    /** Начало части с PostGIS */
-    fetch("http://localhost:8080/feature/getAll")
-      .then(res => res.json())
-      .then((result) => result.map(object => {
-        let feature = new Feature({
-          geometry: new WKT().readGeometry(object[3]),
-          featureProjection: get("EPSG:3857"),
-          id: object[0],
-          name: object[1],
-          description: object[2],
-        })
-        feature.setStyle(getFeatureStyle(feature))
-        features.push(feature)
-      })) 
-    fetch("http://localhost:8080/circle/getAll")
-      .then(res => res.json())
-      .then((result) => result.map(circle => {
-        let feature = new Feature({
-          geometry: new Circle(circle.center, circle.radius),
-          featureProjection: get("EPSG:3857"),
-          id: circle.id,
-          name: circle.name,
-          description: circle.description,
-        })
-        feature.setStyle(getFeatureStyle(feature))
-        features.push(feature);
-      }))
-    /** Конец части с PostGIS */
-    /** Начало части без PostGIS */
-    /*
-    fetch("http://localhost:8080/polygon/getAll")
-      .then(res => res.json())
-      .then((result) => result.map(geometry => {
-        let feature = new Feature({
-          geometry: new GeoJSON().readGeometry(geometry),
-          featureProjection: get("EPSG:3857"),
-          description: "Area: " + geometry.size,      
-        })
-        feature.setStyle(new Style({
-          stroke: new Stroke({
-            color: "rgba(122, 3, 3)",
-            width: 3,
-          }),
-          fill: new Fill({
-            color: "rgba(36, 171, 212, 0.3)",
-          }),        
-          text: new Text({
-            font: "bold italic 15px serif",
-            fill: new Fill({
-              color: "rgba(122, 3, 3)",
-            }),
-            text: geometry.name,
-          })
-        }))
-        features.push(feature);
-      }))
-    fetch("http://localhost:8080/circle/getAll")
-      .then(res => res.json())
-      .then((result) => result.map(geometry => {
-        let feature = new Feature({
-          geometry: new Circle(geometry.center, geometry.radius),
-          featureProjection: get("EPSG:3857"),
-          description: "Area: " + geometry.size,
-        })
-        feature.setStyle(new Style({
-          stroke: new Stroke({
-            color: "rgba(0, 122, 122)",
-            width: 3,
-          }),
-          fill: new Fill({
-            color: "rgba(228, 28, 128, 0.2)",
-          }),        
-          text: new Text({
-            font: "bold italic 15px serif",
-            fill: new Fill({
-              color: "rgba(0, 122, 122)",
-            }),
-            text: geometry.name,
-          })
-        }))
-        features.push(feature);
-      }))
-    fetch("http://localhost:8080/line/getAll")
-      .then(res => res.json())
-      .then((result) => result.map(geometry => {
-        let feature = new Feature({
-          geometry: new GeoJSON().readGeometry(geometry),
-          featureProjection: get("EPSG:3857"),
-          description: "Length: " + geometry.size,
-        });
-        feature.setStyle(new Style({
-          stroke: new Stroke({
-            color: "rgba(121, 0, 143)",
-            width: 3,
-          }),     
-          text: new Text({
-            font: "bold italic 15px serif",
-            offsetY: -11,
-            placement: "line",
-            fill: new Fill({
-              color: "rgba(121, 0, 143)",
-            }),
-            text: geometry.name,
-          })
-        }))
-        features.push(feature);
-      }))
-    fetch("http://localhost:8080/point/getAll")
-      .then(res => res.json())
-      .then((result) => result.map(geometry => {
-        let feature = new Feature({
-          geometry: new GeoJSON().readGeometry(geometry),
-          featureProjection: get("EPSG:3857"),
-          description: geometry.description,
-        });
-        feature.setStyle(new Style({
-          image: new Icon({
-            src: gasIcon,
-            scale: 0.07,
-          }),
-          text: new Text({
-            font: "bold italic 15px serif",            
-            offsetX: 75,
-            fill: new Fill({
-              color: blue[900],
-            }),
-            text: geometry.name,
-          })
-        }));
-        features.push(feature);
-      }))
-      */
-    /** Конец части без PostGIS */
-    return features;
-  }
+  }  
 
   return (
     <div>
@@ -301,13 +85,7 @@ function MapContent() {
               })}
               style = {style}
             />
-          )}
-          <VectorLayer 
-            zIndex={2}
-            source={new olSource.Vector({
-              features: loadFeatures(),
-            })}
-            />                   
+          )}                 
           {showLayer2 && (
             <VectorLayer
               source = {new olSource.Vector({
@@ -357,8 +135,9 @@ function MapContent() {
                 <option value='Circle'>Circle</option>
               </select>
             </div>
-            <button className='form-control' id='modify'><i className='fa fa-edit'/></button>           
-            <button className="form-control" id="undo"><i className='fa fa-undo'/></button>           
+            <button className='form-control' id='modify' title='Toggle edit mode'><i className='fa fa-edit'/></button>           
+            <button className="form-control" id="undo" disabled title='Remove last point'><i className='fa fa-undo'/></button>  
+            <button className='form-control' id='remove' disabled title='Remove selected feature'><i className='fa fa-trash'/></button>         
           </span>
         </div>
       </div>

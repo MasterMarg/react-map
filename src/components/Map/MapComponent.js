@@ -4,7 +4,7 @@ import MapContext from './MapContext';
 import './Map.css';
 import { Overlay } from 'ol';
 import { Draw, Select, Modify } from 'ol/interaction';
-import { Vector as VectorSource } from 'ol/source';
+import { ImageWMS, TileWMS, Vector, Vector as VectorSource } from 'ol/source';
 import VectorLayer from 'ol/layer/Vector';
 import { ScaleLine, MousePosition, defaults as defaultControls } from 'ol/control';
 import { createStringXY } from 'ol/coordinate';
@@ -13,6 +13,14 @@ import { Circle, LineString, Point, Polygon } from 'ol/geom';
 import { fromCircle } from 'ol/geom/Polygon';
 import { unByKey } from 'ol/Observable';
 import WKT from 'ol/format/WKT';
+import gasIcon from '../../resources/Газ.png';
+import { blue } from '@mui/material/colors';
+import Collection from 'ol/Collection';
+import { Style, Icon, Stroke, Fill, Text } from 'ol/style';
+import Feature from 'ol/Feature';
+import { get } from 'ol/proj';
+import ImageLayer from 'ol/layer/Image';
+import TileLayer from 'ol/layer/Tile';
 
 const MapComponent = ({ children, zoom, center }) => {
     const mapRef = React.useRef();
@@ -29,18 +37,241 @@ const MapComponent = ({ children, zoom, center }) => {
         const invertColorsCheckbox = document.getElementById('invertColors');
         const modifyButton = document.getElementById('modify');
         const undoButton = document.getElementById('undo');
+        const removeButton = document.getElementById('remove');
 
         let control;
+        let mapView = new ol.View({ zoom, center });
         
         let options = {
-            view: new ol.View({ zoom, center }),
+            view: mapView,
             layers: [],
             controls: defaultControls().extend([scaleControl()]),
             overlays: []
         };
 
         let mapObject = new ol.Map(options);
-        mapObject.setTarget(mapRef.current);        
+        mapObject.setTarget(mapRef.current);  
+        
+        /** Начало блока слоя фич из БД */
+        function getFeatureStyle(feature) {  
+            let geometry = feature.getGeometry();
+            if (geometry instanceof Circle) {
+              return new Style({
+                stroke: new Stroke({
+                  color: "rgba(0, 122, 122)",
+                  width: 3,
+                }),
+                fill: new Fill({
+                  color: "rgba(228, 28, 128, 0.2)",
+                }),        
+                text: new Text({
+                  font: "bold italic 15px serif",
+                  fill: new Fill({
+                    color: "rgba(0, 122, 122)",
+                  }),
+                  text: feature.get("name"),
+                })
+              })
+            } 
+            if (geometry instanceof Polygon) {
+              return new Style({
+                stroke: new Stroke({
+                  color: "rgba(122, 3, 3)",
+                  width: 3,
+                }),
+                fill: new Fill({
+                  color: "rgba(36, 171, 212, 0.3)",
+                }),        
+                text: new Text({
+                  font: "bold italic 15px serif",
+                  fill: new Fill({
+                    color: "rgba(122, 3, 3)",
+                  }),
+                  text: feature.get("name"),
+                })
+              })
+            } 
+            if (geometry instanceof LineString) {
+              return new Style({
+                stroke: new Stroke({
+                  color: "rgba(121, 0, 143)",
+                  width: 3,
+                }),     
+                text: new Text({
+                  font: "bold italic 15px serif",
+                  offsetY: -11,
+                  placement: "line",
+                  fill: new Fill({
+                    color: "rgba(121, 0, 143)",
+                  }),
+                  text: feature.get("name"),
+                })
+              })
+            }
+            if (geometry instanceof Point) {
+              return new Style({
+                image: new Icon({
+                  src: gasIcon,
+                  scale: 0.07,
+                }),
+                text: new Text({
+                  font: "bold italic 15px serif",            
+                  offsetX: 75,
+                  fill: new Fill({
+                    color: blue[900],
+                  }),
+                  text: feature.get("name"),
+                })
+              })
+            }
+        }
+
+        function loadFeatures() {
+            let features = new Collection();  
+            /** Начало части с PostGIS */
+            fetch("http://localhost:8080/feature/getAll")
+              .then(res => res.json())
+              .then((result) => result.map(object => {
+                let feature = new Feature({
+                  geometry: new WKT().readGeometry(object[3]),
+                  featureProjection: get("EPSG:3857"),
+                  id: object[0],
+                  name: object[1],
+                  description: object[2],
+                })
+                feature.setStyle(getFeatureStyle(feature))
+                features.push(feature)
+              })) 
+            fetch("http://localhost:8080/circle/getAll")
+              .then(res => res.json())
+              .then((result) => result.map(circle => {
+                let feature = new Feature({
+                  geometry: new Circle(circle.center, circle.radius),
+                  featureProjection: get("EPSG:3857"),
+                  id: circle.id,
+                  name: circle.name,
+                  description: circle.description,
+                })
+                feature.setStyle(getFeatureStyle(feature))
+                features.push(feature);
+              }))
+            /** Конец части с PostGIS */
+            /** Начало части без PostGIS */
+            /*
+            fetch("http://localhost:8080/polygon/getAll")
+              .then(res => res.json())
+              .then((result) => result.map(geometry => {
+                let feature = new Feature({
+                  geometry: new GeoJSON().readGeometry(geometry),
+                  featureProjection: get("EPSG:3857"),
+                  description: "Area: " + geometry.size,      
+                })
+                feature.setStyle(new Style({
+                  stroke: new Stroke({
+                    color: "rgba(122, 3, 3)",
+                    width: 3,
+                  }),
+                  fill: new Fill({
+                    color: "rgba(36, 171, 212, 0.3)",
+                  }),        
+                  text: new Text({
+                    font: "bold italic 15px serif",
+                    fill: new Fill({
+                      color: "rgba(122, 3, 3)",
+                    }),
+                    text: geometry.name,
+                  })
+                }))
+                features.push(feature);
+              }))
+            fetch("http://localhost:8080/circle/getAll")
+              .then(res => res.json())
+              .then((result) => result.map(geometry => {
+                let feature = new Feature({
+                  geometry: new Circle(geometry.center, geometry.radius),
+                  featureProjection: get("EPSG:3857"),
+                  description: "Area: " + geometry.size,
+                })
+                feature.setStyle(new Style({
+                  stroke: new Stroke({
+                    color: "rgba(0, 122, 122)",
+                    width: 3,
+                  }),
+                  fill: new Fill({
+                    color: "rgba(228, 28, 128, 0.2)",
+                  }),        
+                  text: new Text({
+                    font: "bold italic 15px serif",
+                    fill: new Fill({
+                      color: "rgba(0, 122, 122)",
+                    }),
+                    text: geometry.name,
+                  })
+                }))
+                features.push(feature);
+              }))
+            fetch("http://localhost:8080/line/getAll")
+              .then(res => res.json())
+              .then((result) => result.map(geometry => {
+                let feature = new Feature({
+                  geometry: new GeoJSON().readGeometry(geometry),
+                  featureProjection: get("EPSG:3857"),
+                  description: "Length: " + geometry.size,
+                });
+                feature.setStyle(new Style({
+                  stroke: new Stroke({
+                    color: "rgba(121, 0, 143)",
+                    width: 3,
+                  }),     
+                  text: new Text({
+                    font: "bold italic 15px serif",
+                    offsetY: -11,
+                    placement: "line",
+                    fill: new Fill({
+                      color: "rgba(121, 0, 143)",
+                    }),
+                    text: geometry.name,
+                  })
+                }))
+                features.push(feature);
+              }))
+            fetch("http://localhost:8080/point/getAll")
+              .then(res => res.json())
+              .then((result) => result.map(geometry => {
+                let feature = new Feature({
+                  geometry: new GeoJSON().readGeometry(geometry),
+                  featureProjection: get("EPSG:3857"),
+                  description: geometry.description,
+                });
+                feature.setStyle(new Style({
+                  image: new Icon({
+                    src: gasIcon,
+                    scale: 0.07,
+                  }),
+                  text: new Text({
+                    font: "bold italic 15px serif",            
+                    offsetX: 75,
+                    fill: new Fill({
+                      color: blue[900],
+                    }),
+                    text: geometry.name,
+                  })
+                }));
+                features.push(feature);
+              }))
+              */
+            /** Конец части без PostGIS */
+            return features;
+        }
+
+        let dbLayer = new VectorLayer({
+            zIndex: 2,
+            source: new Vector({
+                features: loadFeatures(),
+            })
+        })
+        mapObject.addLayer(dbLayer);
+        /** Конец блока слоя фич из БД */
         
         let isModifyModeOn = false;
         /** Блок оверлея с всплывающей информацией по фичам */
@@ -55,6 +286,7 @@ const MapComponent = ({ children, zoom, center }) => {
                 /** Условие, чтобы всплывающие окна вылезали только если режим рисования выключен */
                 if (!isModifyModeOn && drawTypeSelect.value === 'None') {
                 mapObject.forEachFeatureAtPixel(e.pixel, (feature, layer) => {
+                    console.log('333')
                     document.querySelector('.ol-overlaycontainer').innerHTML = feature.get('description');                
                     overlay.setPosition(e.coordinate);
                 })
@@ -125,10 +357,7 @@ const MapComponent = ({ children, zoom, center }) => {
         let value = drawTypeSelect.value
         modifyButton.onclick = function() {
             if (value === 'None') {
-                isModifyModeOn = !isModifyModeOn;
-                modifyButton.classList.toggle('form-control-toggled')
-                drawTypeSelect.disabled = isModifyModeOn;
-                undoButton.disabled = isModifyModeOn;
+                toggleButtons();
                 overlay.setPosition(undefined);
                 addInteraction();
             }
@@ -158,14 +387,15 @@ const MapComponent = ({ children, zoom, center }) => {
                     type: drawTypeSelect.value,
                 })
                 mapObject.addInteraction(draw);
-                /** Для точек не нужен тултип, у них нет длины или плошади, нет информации, а div будут
-                 *  плодиться.
+                /** Для точек не нужен тултип, у них нет длины или плошади,
+                 *  нет информации, а div будут плодиться.
                  */
 
                 draw.on('drawstart', (e) => {
                     sketch = e.feature;
                     /** Для точек это лишняя логика */
-                    if (value !== 'Point') {
+                    if (value !== 'Point') {                        
+                        undoButton.disabled = false;
                         let geom;
                         let tooltipCoord = e.coordinate;
                         listener = sketch.getGeometry().on('change', (evt) => {
@@ -253,6 +483,7 @@ const MapComponent = ({ children, zoom, center }) => {
                             })
                         })  
                     }
+                    undoButton.disabled = true;
                     /** Конец части для PostGIS */
                     /** Начало части без PostGIS */   
                     /*           
@@ -316,6 +547,7 @@ const MapComponent = ({ children, zoom, center }) => {
 
                 function abortDrawing() {
                     draw.abortDrawing();
+                    undoButton.disabled = true;
                     measureTooltip.setPosition(undefined);
                 }
             } else {
@@ -324,6 +556,7 @@ const MapComponent = ({ children, zoom, center }) => {
                     let feature;
                     select = new Select({
                         wrapX: false,
+                        layers: [dbLayer],
                         filter: function(featureToSelect, layer) {
                             if (feature) {
                                 /** Ищем ближайшую точку из геометрии и сравниваем координаты
@@ -364,7 +597,8 @@ const MapComponent = ({ children, zoom, center }) => {
                          * координате, а не просто выбирать первую фичу
                          * сверху
                          */
-                        feature = e.selected[0];                        
+                        feature = e.selected[0];
+                        removeButton.disabled = !feature;   
                     })
                     modify.on('modifystart', (e) => {
                         /** Для точек это лишняя логика */
@@ -422,17 +656,57 @@ const MapComponent = ({ children, zoom, center }) => {
                                 })
                             })
                         }
-                        mapObject.removeInteraction(modify);
-                        mapObject.removeInteraction(select);
-                        isModifyModeOn = !isModifyModeOn;
-                        modifyButton.classList.toggle('form-control-toggled')
-                        drawTypeSelect.disabled = isModifyModeOn;
-                        undoButton.disabled = isModifyModeOn;
+                        disableEditMode();
+                        feature = null;
                         if (value !== 'Point') {
-                            feature = null;
                             measureTooltip.setPosition(undefined);
                         }
                     }) 
+                    
+                    /** Кнопка удаления фич */
+                    removeButton.onclick = function() {
+                        /** Только что отрисованные фичи (до перезагрузки
+                         * приложения) лежат в сорсе drawSource, в отдельном
+                         * слое для рисования, их удалить нельзя (только
+                         * в процессе рисования удалять кнопкой Undo,
+                         * а сразу по завершении уже нельзя, только после
+                         * перезагрузки приложения (обновления страницы),
+                         * когда они подтянутся в загружаемый слой).
+                         * Реализовать удаление сложно, потому что однозначно
+                         * определить фичу можно только по id, а у новых
+                         * отрисованных фич еще нет id, он создается при
+                         * сохранении в БД и получается потом при обратной
+                         * загрузке фичи из БД. То есть удалить по id можно
+                         * только загруженные из БД фичи. Удалять без id
+                         * не получится, потому что у нескольких фич может быть
+                         * одинаковая геометрия */
+                        if (dbLayer.getSource().hasFeature(feature)
+                            || drawSource.hasFeature(feature)) {
+                            dbLayer.getSource().removeFeature(feature);
+                            removeButton.disabled = true;
+                            disableEditMode();
+                            let restURL = feature.getGeometry() instanceof Circle 
+                                ? "http://localhost:8080/circle/delete" 
+                                : "http://localhost:8080/feature/delete";
+                            fetch(restURL, {
+                                method: "DELETE",
+                                headers: {"Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    "id": feature.get("id"),
+                                })
+                            })
+                        }
+                    }
+                    /** Конец блока кнопки удаления фич */
+
+                    /** Выключает режим редактирования, переключает кнопки
+                     * и т.д.
+                     */
+                    function disableEditMode() {
+                        mapObject.removeInteraction(modify);
+                        mapObject.removeInteraction(select);
+                        toggleButtons();
+                    }                    
                 /** Конец блока с модифицированием фич */
                 } else {
                     mapObject.removeInteraction(modify);
@@ -440,6 +714,13 @@ const MapComponent = ({ children, zoom, center }) => {
                 }                        
             }
         }
+        /** Переключатель кнопок управления фичей */
+        function toggleButtons() {
+            isModifyModeOn = !isModifyModeOn;
+            modifyButton.classList.toggle('form-control-toggled')
+            drawTypeSelect.disabled = isModifyModeOn;
+        }
+        /** Конец переключателя кнопок управления фичей */
 
         /** Переключатель типа рисовки */
         drawTypeSelect.onchange = (event) => {
