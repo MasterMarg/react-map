@@ -135,6 +135,7 @@ function MapContent() {
                 <option value='Circle'>Circle</option>
               </select>
             </div>
+            <button className='form-control' id='measure' title='Toggle measure mode'><i className='fa fa-compress'/></button>
             <button className='form-control' id='modify' title='Toggle edit mode'><i className='fa fa-edit'/></button>           
             <button className="form-control" id="undo" disabled title='Remove last point'><i className='fa fa-undo'/></button>  
             <button className='form-control' id='remove' disabled title='Remove selected feature'><i className='fa fa-trash'/></button>         

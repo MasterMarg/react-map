@@ -21,6 +21,7 @@ import Feature from 'ol/Feature';
 import { get } from 'ol/proj';
 import ImageLayer from 'ol/layer/Image';
 import TileLayer from 'ol/layer/Tile';
+import GeoJSON from 'ol/format/GeoJSON';
 
 const MapComponent = ({ children, zoom, center }) => {
     const mapRef = React.useRef();
@@ -38,6 +39,7 @@ const MapComponent = ({ children, zoom, center }) => {
         const modifyButton = document.getElementById('modify');
         const undoButton = document.getElementById('undo');
         const removeButton = document.getElementById('remove');
+        const measureButton = document.getElementById('measure');
 
         let control;
         let mapView = new ol.View({ zoom, center });
@@ -272,8 +274,29 @@ const MapComponent = ({ children, zoom, center }) => {
         })
         mapObject.addLayer(dbLayer);
         /** Конец блока слоя фич из БД */
+
+        /** Тест с геосервером */
+        let wmsLayer =  new ImageLayer({
+            zIndex: 2,
+            source: new ImageWMS({
+              url: 'http://192.168.3.15:5557/geoserver/wms',
+              params: {'LAYERS': 'kust_v060922:outputs'},
+            }),
+        })
+        mapObject.addLayer(wmsLayer);
+        const wmsSource = new TileWMS({
+            url: 'http://192.168.3.15:5557/geoserver/wms',
+            params: {'layers': 'kust_v060922:pipes', 'tiled':'true'},
+        })
+        const wmsLayer2 = new TileLayer({
+            zIndex:1,
+            source: wmsSource,
+        })
+        mapObject.addLayer(wmsLayer2)
+        /** Конец теста с геосервером */
         
         let isModifyModeOn = false;
+        let isMeasureModeOn = false;
         /** Блок оверлея с всплывающей информацией по фичам */
         const overlay = new Overlay({
             element: document.querySelector('.ol-overlaycontainer'),
@@ -283,13 +306,38 @@ const MapComponent = ({ children, zoom, center }) => {
 
         mapObject.on('click', (e) => {
             overlay.setPosition(undefined);
-                /** Условие, чтобы всплывающие окна вылезали только если режим рисования выключен */
-                if (!isModifyModeOn && drawTypeSelect.value === 'None') {
+                /** Условие, чтобы всплывающие окна вылезали только если режимы рисования и измерения выключены */
+            if (!isMeasureModeOn && !isModifyModeOn && drawTypeSelect.value === 'None') {
                 mapObject.forEachFeatureAtPixel(e.pixel, (feature, layer) => {
-                    console.log('333')
                     document.querySelector('.ol-overlaycontainer').innerHTML = feature.get('description');                
                     overlay.setPosition(e.coordinate);
                 })
+                if (!overlay.getPosition()) {
+                    const url = wmsSource.getFeatureInfoUrl(
+                        e.coordinate,
+                        mapView.getResolution(),
+                        'EPSG:3857',
+                        {
+                            'info_format': 'application/json',
+                            'query_layers': wmsSource.getParams().layers,
+                        }
+                    )
+                    if (url) {
+                        fetch(url)
+                            .then(res => res.json())
+                            .then((result) => {
+                                if (result.features.length > 0) {                                    
+                                    /* можно напрямую по свойствам, но не очень красиво
+                                    console.log(result.features[0].properties.Наиме)
+                                    */
+                                    let loadedFeature = new GeoJSON().readFeature(result.features[0])
+                                    document.querySelector('.ol-overlaycontainer').innerHTML = 
+                                        loadedFeature.get("Наиме") + "\nКуст: " + loadedFeature.get("Куст");                                
+                                    overlay.setPosition(e.coordinate);
+                                } 
+                            })
+                    }
+                }
             }
         });
         /** Конец блока оверлея с всплывающей информацией по фичам */
@@ -355,11 +403,63 @@ const MapComponent = ({ children, zoom, center }) => {
         let select;
         let modify;
         let value = drawTypeSelect.value
+
+        /** Кнопка переключения режима редактирования */
         modifyButton.onclick = function() {
             if (value === 'None') {
                 toggleButtons();
                 overlay.setPosition(undefined);
                 addInteraction();
+            }
+        }
+
+        /** Кнопка переключения режима измерения */  
+        let source = new VectorSource({wrapX: false})
+        let layer = new VectorLayer({
+            source: source,
+            zIndex: 4,
+        })
+        mapObject.addLayer(layer); 
+
+        let measureDraw = new Draw({
+            source: source,
+            type: 'LineString',
+            maxPoints: 2,
+        })
+
+        let drawnFeature;     
+        measureDraw.on('drawstart', (e) => {            
+            source.clear();
+            measureTooltipElement.className = 'ol-tooltip ol-tooltip-measure';
+            drawnFeature = e.feature;
+            drawnFeature.getGeometry().on('change', (event) => {
+                measureTooltipElement.innerHTML = 'Distance: ' + formatLength(drawnFeature.getGeometry())
+                measureTooltip.setPosition(drawnFeature.getGeometry().getLastCoordinate())
+            })
+        })
+        measureDraw.on('drawend', () => {
+            measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
+            drawnFeature.setStyle(new Style({
+                stroke: new Stroke({
+                    color: 'dodgerblue',
+                    width: 3,
+                })
+            }))
+        })
+
+        measureButton.onclick = function() {
+            if (value === 'None') {
+                isMeasureModeOn = !isMeasureModeOn;
+                measureButton.classList.toggle('form-control-toggled')
+                modifyButton.disabled = isMeasureModeOn;
+                drawTypeSelect.disabled = isMeasureModeOn;
+                if (isMeasureModeOn) {                       
+                    mapObject.addInteraction(measureDraw);
+                } else {
+                    source.clear();
+                    measureTooltip.setPosition(undefined);
+                    mapObject.removeInteraction(measureDraw);
+                }
             }
         }
 
@@ -680,8 +780,11 @@ const MapComponent = ({ children, zoom, center }) => {
                          * только загруженные из БД фичи. Удалять без id
                          * не получится, потому что у нескольких фич может быть
                          * одинаковая геометрия */
-                        if (dbLayer.getSource().hasFeature(feature)
-                            || drawSource.hasFeature(feature)) {
+                        /** Возможно можно проставлять id не в параметры
+                         * фичи а прямо методом setId(), я не уверен, что у фич
+                         * разной геометрии id и слоев не пересекаются, поэтому
+                         * оставил так */
+                        if (dbLayer.getSource().hasFeature(feature)) {
                             dbLayer.getSource().removeFeature(feature);
                             removeButton.disabled = true;
                             disableEditMode();
@@ -716,9 +819,15 @@ const MapComponent = ({ children, zoom, center }) => {
         }
         /** Переключатель кнопок управления фичей */
         function toggleButtons() {
+            //TO DO: включить режим редактирования, выбрать фичу, выключить
+            // кнопка удаления остается активной, поправить, чтоб выключалась
             isModifyModeOn = !isModifyModeOn;
             modifyButton.classList.toggle('form-control-toggled')
+            measureButton.disabled = isModifyModeOn;
             drawTypeSelect.disabled = isModifyModeOn;
+            if (!isModifyModeOn) {
+                removeButton.disabled = true;
+            }
         }
         /** Конец переключателя кнопок управления фичей */
 
@@ -743,6 +852,7 @@ const MapComponent = ({ children, zoom, center }) => {
                 overlayDiv.parentNode.removeChild(overlayDiv);
             }
             modifyButton.disabled = event.target.value !== 'None'
+            measureButton.disabled = event.target.value !== 'None'
             /** Конец вырезания последнего заготовленного div'а */
             addInteraction();
         }
