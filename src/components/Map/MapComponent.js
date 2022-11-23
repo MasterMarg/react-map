@@ -277,7 +277,7 @@ const MapComponent = ({ children, zoom, center }) => {
 
         /** Тест с геосервером */
         let wmsLayer =  new ImageLayer({
-            zIndex: 2,
+            zIndex: 3,
             source: new ImageWMS({
               url: 'http://192.168.3.15:5557/geoserver/wms',
               params: {'LAYERS': 'kust_v060922:outputs'},
@@ -289,10 +289,22 @@ const MapComponent = ({ children, zoom, center }) => {
             params: {'layers': 'kust_v060922:pipes', 'tiled':'true'},
         })
         const wmsLayer2 = new TileLayer({
-            zIndex:1,
+            zIndex:2,
             source: wmsSource,
         })
         mapObject.addLayer(wmsLayer2)
+        /** Слой с подложкой */
+        /*
+        let wmsLayer3 = new TileLayer({
+            zIndex: 1,
+            source: new TileWMS({
+                url: 'http://192.168.3.15:5557/geoserver/wms',
+                params: {'layers':'	kust_redo:surface_201022_v2', 'tiled':'true'}
+            })
+        })
+        mapObject.addLayer(wmsLayer3) 
+        */      
+        /** Конец слоя с подложкой */
         /** Конец теста с геосервером */
         
         let isModifyModeOn = false;
