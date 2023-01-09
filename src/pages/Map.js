@@ -125,6 +125,15 @@ function MapContent() {
         </div>
         <div className='col-auto'>
           <span className='input-group'>
+            <label className='input-group-text' htmlFor='mousePositionProjection'>MP projection:</label>
+            <select className='form-select' id='mousePositionProjection' defaultValue='EPSG:4326'>
+              <option value='EPSG:4326'>EPSG:4326</option>
+              <option value='EPSG:40004'>EPSG:40004</option>
+            </select>
+          </span>
+        </div>
+        <div className='col-auto'>
+          <span className='input-group'>
             <label className="input-group-text" htmlFor="drawType">Geometry type:</label>
             <div className='form-select-box'>
               <select className='form-select' id='drawType' defaultValue='None'>          

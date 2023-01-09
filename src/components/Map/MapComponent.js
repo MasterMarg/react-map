@@ -22,6 +22,8 @@ import { get } from 'ol/proj';
 import ImageLayer from 'ol/layer/Image';
 import TileLayer from 'ol/layer/Tile';
 import GeoJSON from 'ol/format/GeoJSON';
+import proj4 from 'proj4';
+import { register } from 'ol/proj/proj4';
 
 const MapComponent = ({ children, zoom, center }) => {
     const mapRef = React.useRef();
@@ -40,6 +42,7 @@ const MapComponent = ({ children, zoom, center }) => {
         const undoButton = document.getElementById('undo');
         const removeButton = document.getElementById('remove');
         const measureButton = document.getElementById('measure');
+        const mouseProjection = document.getElementById('mousePositionProjection');
 
         let control;
         let mapView = new ol.View({ zoom, center });
@@ -354,11 +357,18 @@ const MapComponent = ({ children, zoom, center }) => {
         });
         /** Конец блока оверлея с всплывающей информацией по фичам */
 
-        /** Блок координат курсора */
+        /** Блок координат курсора */                    
+        proj4.defs(
+            'EPSG:40004',
+            'PROJCS["MSK-89 zone 4 (6 grad) YNAO", GEOGCS["Krassovsky, 1942", DATUM["Pulkovo 1942", SPHEROID["krass", 6378245.0, 298.3], TOWGS84[23.57, -140.95, -79.8, 0.0, 0.35, 0.79, -0.22]], PRIMEM["Greenwich", 0.0], UNIT["degree", 0.017453292519943295], AXIS["Longitude", EAST], AXIS["Latitude", NORTH]], PROJECTION["Transverse_Mercator"], PARAMETER["central_meridian", 78.05], PARAMETER["latitude_of_origin", 0.0], PARAMETER["scale_factor", 1.0], PARAMETER["false_easting", 4500000.0], PARAMETER["false_northing", -5811057.63], UNIT["m", 1.0], AXIS["x", EAST], AXIS["y", NORTH], AUTHORITY["EPSG","40004"]]',
+        );
+        register(proj4);
+
         let mousePosition = new MousePosition({
             coordinateFormat: createStringXY(7),
-            projection: "EPSG:4326",
+            projection: mouseProjection.value,
         });
+
         mapObject.getViewport().addEventListener('mouseenter', (e) => {
             mapObject.addControl(mousePosition);
         })
@@ -366,6 +376,10 @@ const MapComponent = ({ children, zoom, center }) => {
         mapObject.getViewport().addEventListener('mouseleave', (e) => {
             mapObject.removeControl(mousePosition);
         })
+
+        function onProjectionChanged() {
+            mousePosition.setProjection(mouseProjection.value);
+        }
         /** Конец блока координат курсора */
 
         /** Блок линейки в углу карты */
@@ -406,6 +420,7 @@ const MapComponent = ({ children, zoom, center }) => {
         }
         /** Конец блока линейки в углу карты */
 
+        mouseProjection.addEventListener('change', onProjectionChanged)
         unitsSelect.addEventListener('change', onChangeUnit);
         scaleTypeSelect.addEventListener('change', reconfigureScaleLine);
         stepsRange.addEventListener('input', reconfigureScaleLine);
